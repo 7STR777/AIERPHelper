@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+#   n8n:
+#     image: n8nio/n8n
+#     container_name: n8n
+#     ports:
+#       - "5678:5678"
+#     environment:
+#       - GENERIC_TIMEZONE=Europe/Moscow
+#       - TZ=Europe/Moscow
+#       - N8N_BASIC_AUTH_ACTIVE=true
+#       - N8N_BASIC_AUTH_USER=admin
+#       - N8N_BASIC_AUTH_PASSWORD=admin123
+#     volumes:
+#       - n8n_data:/home/node/.n8n
+#     restart: unless-stopped
+
+# volumes:
+#   n8n_data:
