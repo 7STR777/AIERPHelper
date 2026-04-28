@@ -1,13 +1,15 @@
 from llama_cpp import Llama
-from config import MISTRAL_MODEL
+
+from config import LLM_GPU_LAYERS, LLM_N_CTX, MISTRAL_MODEL
+
 
 class MistralLLM:
     def __init__(self):
         self.model = Llama(
             model_path=MISTRAL_MODEL,
-            n_gpu_layers=-1,  # всё на GPU если доступна CUDA
-            n_ctx=4096,
-            verbose=False
+            n_gpu_layers=LLM_GPU_LAYERS,
+            n_ctx=LLM_N_CTX,
+            verbose=False,
         )
 
     def generate(self, prompt: str) -> str:
@@ -19,6 +21,6 @@ class MistralLLM:
             top_k=40,
             repeat_penalty=1.1,
             stop=["Question:", "Вопрос:", "</s>"],
-            echo=False
+            echo=False,
         )
         return output["choices"][0]["text"]

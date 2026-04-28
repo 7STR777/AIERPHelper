@@ -1,26 +1,32 @@
-version: "3.8"
-
 services:
   qdrant:
-    image: qdrant/qdrant
+    image: qdrant/qdrant:v1.13.4
     ports:
       - "6333:6333"
     volumes:
       - ./qdrant_storage:/qdrant/storage
-#   n8n:
-#     image: n8nio/n8n
-#     container_name: n8n
-#     ports:
-#       - "5678:5678"
-#     environment:
-#       - GENERIC_TIMEZONE=Europe/Moscow
-#       - TZ=Europe/Moscow
-#       - N8N_BASIC_AUTH_ACTIVE=true
-#       - N8N_BASIC_AUTH_USER=admin
-#       - N8N_BASIC_AUTH_PASSWORD=admin123
-#     volumes:
-#       - n8n_data:/home/node/.n8n
-#     restart: unless-stopped
 
-# volumes:
-#   n8n_data:
+  rag-api:
+    build: .
+    depends_on:
+      - qdrant
+    environment:
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      COLLECTION_NAME: new_rag_collection
+      EMBEDDING_MODEL: BAAI/bge-m3
+      EMBEDDING_DEVICE: cuda
+      MISTRAL_MODEL_PATH: /models/mistral-7b-instruct-v0.3-q4_k_m.gguf
+      LLM_GPU_LAYERS: -1
+      LLM_N_CTX: 4096
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./rag_test/models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

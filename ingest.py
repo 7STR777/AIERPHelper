@@ -7,10 +7,10 @@ from config import *
 with open("chunks.json", "r", encoding="utf-8") as f:
     chunks = json.load(f)
 
-embedder = EmbeddingService(EMBEDDING_MODEL)
+embedder = EmbeddingService(EMBEDDING_MODEL, EMBEDDING_DEVICE)
 db = VectorDB(QDRANT_HOST, QDRANT_PORT, COLLECTION_NAME)
 
-texts = [f"passage: {c['text']}" for c in chunks]
+texts = [c["text"] for c in chunks]
 
 print("Всего чанков:", len(chunks))
 
