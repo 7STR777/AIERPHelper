@@ -1,80 +1,111 @@
-# RAG API (GPU + Docker + ASP.NET integration)
+# RAG MVP: Python Worker + ASP.NET API + SQL Support Log
 
-## 1) Start services
+## Architecture
 
-```bash
-docker compose up --build
-```
+- `mssql` (`localhost:1433`) stores unanswered user questions.
+- `qdrant` (`localhost:6333`) stores vectors.
+- `rag-api` is Python worker (internal only, no public port).
+- `aspnet-api` (`localhost:8080`) is the only public backend.
 
-RAG API will be available at `http://localhost:8000`.
-Qdrant will be available at `http://localhost:6333`.
+Flow: `Client -> ASP.NET (/rag/ask) -> Python worker -> Qdrant`.
 
-## 2) Ingest chunks into Qdrant
-
-Run once after startup:
+## Run (final release build)
 
 ```bash
-docker compose exec rag-api python3 ingest.py
+docker compose -f docker-compose.release.yml up -d --build
 ```
 
-## 3) API endpoints
+## Fast dev loop (without rebuild)
+
+After first successful `rag-api` image build (from release file), use dev compose:
+
+```bash
+docker compose up -d --force-recreate rag-api aspnet-api
+```
+
+Why no rebuild is needed:
+- `rag-api` mounts project folder to `/app`
+- `aspnet-api` runs `dotnet run` from mounted `./aspnet-backend`
+- HuggingFace/SentenceTransformer cache is persisted in `./hf_cache` to avoid repeated long warmup after container recreate
+
+## Model
+
+Default model path:
+- `/models/qwen2.5-3b-instruct-q4_k_m.gguf`
+
+Local model folder:
+- `D:\ragproject\rag_test\models`
+
+If filename is different, worker auto-selects the best matching `.gguf` from `/models`.
+
+## Re-index vectors (recommended after embedding/retrieval changes)
+
+```bash
+docker compose exec -e RECREATE_COLLECTION=true rag-api python3 ingest.py
+```
+
+## API (ASP.NET only)
 
 - `GET /health`
-- `POST /ask`
+- `POST /rag/warmup`
+- `POST /rag/ask`
 
-Request:
-
-```json
-{
-  "query": "Как создать новую карточку ДСЕ?"
-}
-```
-
-Response:
+Request example:
 
 ```json
 {
-  "answer": "....",
-  "contexts": ["...", "..."]
+  "query": "Как открыть список редакций техпроцесса?"
 }
 ```
 
-## 4) ASP.NET backend example
+PowerShell examples (`curl.exe`, not alias):
 
-```csharp
-using System.Net.Http.Json;
-
-public sealed class RagClient
-{
-    private readonly HttpClient _httpClient;
-
-    public RagClient(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-    }
-
-    public async Task<AskResponse?> AskAsync(string query, CancellationToken ct = default)
-    {
-        var response = await _httpClient.PostAsJsonAsync("/ask", new AskRequest(query), ct);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<AskResponse>(cancellationToken: ct);
-    }
-}
-
-public sealed record AskRequest(string Query);
-public sealed record AskResponse(string Answer, List<string> Contexts);
+```powershell
+curl.exe -X POST http://localhost:8080/rag/warmup
+curl.exe -X POST http://localhost:8080/rag/ask -H "Content-Type: application/json" -d "{\"query\":\"Что такое ДСЕ?\"}"
 ```
 
-`Program.cs`:
+## Unanswered questions in MS SQL
 
-```csharp
-builder.Services.AddHttpClient<RagClient>(client =>
-{
-    client.BaseAddress = new Uri("http://localhost:8000");
-});
+When worker returns "Нет информации в базе", ASP.NET:
+1. returns support message to user;
+2. writes the question into `dbo.RagSupportRequests`.
+
+Table is auto-created on ASP.NET startup.
+
+Columns:
+- `Id` (identity, PK)
+- `Question` (nvarchar(2000))
+- `Endpoint` (nvarchar(128))
+- `WorkerAnswer` (nvarchar(max))
+- `ContextsJson` (nvarchar(max))
+- `ClientIp` (nvarchar(64))
+- `UserAgent` (nvarchar(512))
+- `CreatedAtUtc` (datetime2, default `SYSUTCDATETIME()`)
+
+Check saved requests:
+
+```sql
+SELECT TOP (100) *
+FROM dbo.RagSupportRequests
+ORDER BY CreatedAtUtc DESC;
 ```
 
-## 5) GPU notes
+## Speed defaults
 
-- Requires NVIDIA Container Toolkit on host.
-- If GPU is unavailable, set `EMBEDDING_DEVICE=cpu` and `LLM_GPU_LAYERS=0`.
+- `LLM_N_CTX=1536`
+- `LLM_MAX_TOKENS=200`
+- `LLM_TEMPERATURE=0.1`
+- `LLM_REPEAT_PENALTY=1.15`
+- `RAG_TOP_K=4`
+- `RAG_MAX_CONTEXT_CHARS=2600`
+
+## Quality tuning
+
+Run benchmark and parameter sweep:
+
+```bash
+docker compose exec rag-api python3 tune_params.py
+```
+
+Results are saved to `tune_results.json` inside the project root.
