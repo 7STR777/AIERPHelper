@@ -1,6 +1,7 @@
 import json
 import threading
 import time
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from config import (
@@ -15,11 +16,33 @@ from rag import RAGPipeline
 rag: RAGPipeline | None = None
 rag_lock = threading.Lock()
 
+def load_chunks():
+    path = os.getenv("CHUNKS_PATH", "chunks.json")
+
+    print(f"[chunks] loading from {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # если chunks.json = [{"text":"..."}, ...]
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+        chunks = [x["text"] for x in data if "text" in x]
+
+    # если chunks.json = ["text1", "text2"]
+    else:
+        chunks = data
+
+    print(f"[chunks] loaded: {len(chunks)}")
+
+    return chunks
 
 def get_rag() -> RAGPipeline:
     global rag
+
     if rag is None:
-        rag = RAGPipeline()
+        chunks = load_chunks()
+        rag = RAGPipeline(chunks)
+
     return rag
 
 
@@ -93,18 +116,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             with rag_lock:
                 pipeline = get_rag()
-                result = pipeline.generate(
-                    query=query,
-                    rag_top_k=rag_top_k if isinstance(rag_top_k, int) else RAG_TOP_K,
-                    max_context_chars=(
-                        max_context_chars if isinstance(max_context_chars, int) else RAG_MAX_CONTEXT_CHARS
-                    ),
-                    max_tokens=max_tokens if isinstance(max_tokens, int) else LLM_MAX_TOKENS,
-                    temperature=temperature if isinstance(temperature, (int, float)) else None,
-                    top_p=top_p if isinstance(top_p, (int, float)) else None,
-                    top_k=top_k if isinstance(top_k, int) else None,
-                    repeat_penalty=repeat_penalty if isinstance(repeat_penalty, (int, float)) else None,
-                )
+                result = pipeline.generate(query=query)
             elapsed = time.perf_counter() - started
             print(f"[timing] ask_total_seconds={elapsed:.3f}")
             self._send_json(200, result)

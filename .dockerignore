@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.env
+.git
+.gitignore
+
+# ВАЖНО
+hf_cache/
+.qdrant/
+qdrant_storage/
+kb_data/
+models/
+*.gguf
+rag_test/models/
+aspnet-backend/bin/
+aspnet-backend/obj/
+aspnet-backend/**/bin/
+aspnet-backend/**/obj/
+
+# большие файлы
+*.bin
+*.pt
+
+# OS мусор
+.DS_Store
+Thumbs.db

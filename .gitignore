@@ -1,26 +1,73 @@
-# Qdrant storage (runtime data)
-qdrant_storage/
-
-# Python cache
+# Python
 __pycache__/
-*.pyc
-*.pyo
-
-# Virtual environments
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
 venv/
 env/
+*.egg-info/
+dist/
+build/
+*.egg
 
-# IDE files
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# Logs
+# Кэши и модели (НЕ должны быть в Git)
+hf_cache/
+models/
+*.gguf
+
+# Qdrant storage
+qdrant_storage/
+
+# Docker
+docker-compose.override.yml
+
+# .NET build artifacts
+aspnet-backend/bin/
+aspnet-backend/obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+# Node (если есть)
+node_modules/
+
+# Логи
 *.log
+logs/
 
-# Temporary files
+# Временные файлы
+tmp/
+temp/
 *.tmp
-*.swp
+
+# Конвертированные файлы (если они генерируются)
+
+# Environment файлы с секретами
+.env
+.env.local
+.env.*.local
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Тестовые артефакты
+.pytest_cache/
+.coverage
+htmlcov/
