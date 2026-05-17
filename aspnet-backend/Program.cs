@@ -1,10 +1,16 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
-const string NoInfoText = "\u041d\u0435\u0442 \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u0438 \u0432 \u0431\u0430\u0437\u0435";
-const string SupportMessage = "\u041d\u0435\u0442 \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u0438 \u0432 \u0431\u0430\u0437\u0435. \u041e\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044c \u0432 \u0442\u0435\u0445\u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0443. \u0417\u0430\u043f\u0440\u043e\u0441 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d \u0434\u043b\u044f \u0440\u0430\u0437\u0431\u043e\u0440\u0430.";
+const string NoInfoText = "Нет информации в базе";
+const string SupportMessage = "Нет информации в базе. Обратитесь в техподдержку. Запрос сохранен для разбора.";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +22,64 @@ builder.Services.AddHttpClient("rag", client =>
     client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "DEV_SECRET_KEY_CHANGE_ME_1234567890";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "rag-api";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "rag-client";
+var jwtExpire = builder.Configuration.GetValue("Jwt:ExpireMinutes", 60);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "RAG API Gateway",
+        Version = "v1",
+        Description = "JWT: POST /login с login/password, затем Authorize в Swagger (Bearer token)."
+    });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "JWT из ответа POST /login"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
 var supportDbConnectionString =
     builder.Configuration.GetConnectionString("SupportDb")
     ?? builder.Configuration["SupportDb:ConnectionString"];
@@ -25,13 +89,22 @@ if (!string.IsNullOrWhiteSpace(supportDbConnectionString))
     _ = await TryEnsureSupportTableAsync(supportDbConnectionString);
 }
 
+var users = new Dictionary<string, (string Password, string Role)>(StringComparer.OrdinalIgnoreCase)
+{
+    ["user"] = ("user123", "user"),
+    ["admin"] = ("admin123", "admin")
+};
+
 var app = builder.Build();
 
-app.MapGet("/", () => Results.Json(new
-{
-    service = "aspnet-api",
-    status = "up"
-}));
+app.UseSwagger();
+app.UseSwaggerUI();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapGet("/", () => Results.Json(new { service = "aspnet-api", status = "up" }))
+    .WithTags("System");
 
 app.MapGet("/health", async (IHttpClientFactory httpClientFactory, CancellationToken ct) =>
 {
@@ -49,24 +122,68 @@ app.MapGet("/health", async (IHttpClientFactory httpClientFactory, CancellationT
             statusCode: StatusCodes.Status504GatewayTimeout,
             title: "Gateway timeout");
     }
-});
+})
+.WithTags("System");
 
-app.MapPost("/rag/ask", async (HttpContext httpContext, IHttpClientFactory httpClientFactory, CancellationToken ct) =>
+app.MapPost("/login", (LoginRequest req) =>
 {
-    var query = await ReadQueryAsync(httpContext.Request, ct);
+    if (string.IsNullOrWhiteSpace(req.Login)
+        || !users.TryGetValue(req.Login, out var user)
+        || user.Password != req.Password)
+    {
+        return Results.Unauthorized();
+    }
+
+    var claims = new[]
+    {
+        new Claim(ClaimTypes.Name, req.Login),
+        new Claim(ClaimTypes.Role, user.Role)
+    };
+
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+    var token = new JwtSecurityToken(
+        issuer: jwtIssuer,
+        audience: jwtAudience,
+        claims: claims,
+        expires: DateTime.UtcNow.AddMinutes(jwtExpire),
+        signingCredentials: creds);
+
+    return Results.Ok(new LoginResponse(new JwtSecurityTokenHandler().WriteToken(token)));
+})
+.WithTags("Auth");
+
+app.MapPost("/chat", async (
+    ChatRequest request,
+    HttpContext httpContext,
+    IHttpClientFactory httpClientFactory,
+    CancellationToken ct) =>
+{
+    var query = request.Query;
+    if (string.IsNullOrWhiteSpace(query))
+    {
+        query = await ReadQueryAsync(httpContext.Request, ct);
+    }
+
     if (string.IsNullOrWhiteSpace(query))
     {
         return Results.BadRequest(new { error = "query is required. expected JSON: {\"query\":\"...\"}" });
     }
 
-    return await ForwardAskAsync(
-        endpoint: "/ask",
-        query: query,
-        supportDbConnectionString: supportDbConnectionString,
-        httpContext: httpContext,
-        httpClientFactory: httpClientFactory,
-        ct: ct);
-});
+    return await ForwardChatAsync(
+        query,
+        supportDbConnectionString,
+        httpContext,
+        httpClientFactory,
+        ct);
+})
+.RequireAuthorization()
+.WithTags("Chat")
+.Accepts<ChatRequest>("application/json")
+.Produces<ChatMessageResponse>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized);
 
 app.MapPost("/rag/warmup", async (IHttpClientFactory httpClientFactory, CancellationToken ct) =>
 {
@@ -94,12 +211,12 @@ app.MapPost("/rag/warmup", async (IHttpClientFactory httpClientFactory, Cancella
             statusCode: StatusCodes.Status504GatewayTimeout,
             title: "Gateway timeout");
     }
-});
+})
+.WithTags("RAG");
 
 app.Run();
 
-static async Task<IResult> ForwardAskAsync(
-    string endpoint,
+static async Task<IResult> ForwardChatAsync(
     string query,
     string? supportDbConnectionString,
     HttpContext httpContext,
@@ -110,7 +227,7 @@ static async Task<IResult> ForwardAskAsync(
     {
         var client = httpClientFactory.CreateClient("rag");
         using var content = BuildJsonContent(new { query });
-        var response = await client.PostAsync(endpoint, content, ct);
+        var response = await client.PostAsync("/ask", content, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -122,35 +239,29 @@ static async Task<IResult> ForwardAskAsync(
         }
 
         var workerResponse = ParseWorkerResponse(body);
+        var messageId = Guid.NewGuid().ToString("N");
+        var timestamp = DateTime.UtcNow;
+
         if (workerResponse is null)
         {
-            return Results.Content(body, "application/json");
+            return Results.Json(new ChatMessageResponse(messageId, body, timestamp));
         }
 
         if (IsNoInfoAnswer(workerResponse.Answer))
         {
-            var logged = await TrySaveSupportRequestAsync(
+            _ = await TrySaveSupportRequestAsync(
                 supportDbConnectionString,
                 query,
-                endpoint,
+                "/chat",
                 workerResponse.Answer,
                 workerResponse.Contexts,
                 httpContext,
                 ct);
 
-            return Results.Json(new
-            {
-                answer = SupportMessage,
-                contexts = workerResponse.Contexts,
-                support_request_logged = logged
-            });
+            return Results.Json(new ChatMessageResponse(messageId, SupportMessage, timestamp));
         }
 
-        return Results.Json(new
-        {
-            answer = workerResponse.Answer,
-            contexts = workerResponse.Contexts
-        });
+        return Results.Json(new ChatMessageResponse(messageId, workerResponse.Answer, timestamp));
     }
     catch (TaskCanceledException)
     {
@@ -184,6 +295,7 @@ static WorkerResponse? ParseWorkerResponse(string body)
         {
             return null;
         }
+
         return parsed with { Contexts = parsed.Contexts ?? [] };
     }
     catch
@@ -335,5 +447,16 @@ VALUES
         return false;
     }
 }
+
+internal sealed record LoginRequest(string Login, string Password);
+
+internal sealed record LoginResponse(string Token);
+
+internal sealed record ChatRequest(string Query);
+
+internal sealed record ChatMessageResponse(
+    [property: JsonPropertyName("messageID")] string MessageId,
+    [property: JsonPropertyName("content")] string Content,
+    [property: JsonPropertyName("timestamp")] DateTime Timestamp);
 
 internal sealed record WorkerResponse(string Answer, List<string> Contexts);

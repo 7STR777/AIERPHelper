@@ -7,7 +7,6 @@ __pycache__/
 .git
 .gitignore
 
-# ВАЖНО
 hf_cache/
 .qdrant/
 qdrant_storage/
@@ -20,10 +19,8 @@ aspnet-backend/obj/
 aspnet-backend/**/bin/
 aspnet-backend/**/obj/
 
-# большие файлы
 *.bin
 *.pt
 
-# OS мусор
 .DS_Store
 Thumbs.db

@@ -1,7 +1,7 @@
 # RAG проект на Python + ASP.NET + Qdrant
 
 Этот проект реализует RAG-пайплайн для корпоративной информационной системы:
-- `aspnet-backend` — публичный API на ASP.NET, принимает запросы от клиента;
+- `aspnet-backend` — публичный API на ASP.NET (JWT, Swagger, эндпоинты `/login` и `/chat`);
 - `rag-api` — Python-воркер, выполняет поиск по векторной базе и подставляет контекст в LLM;
 - `qdrant` — хранилище векторных эмбеддингов;
 - `mssql` — хранилище неответов для дальнейшей обработки.
@@ -10,7 +10,7 @@
 
 - `docker-compose.yml` — основная конфигурация для запуска всех сервисов;
 - `Dockerfile` — образ для Python-воркера;
-- `aspnet-backend/` — API на .NET 8.0;
+- `aspnet-backend/` — API-шлюз на .NET 8.0 (`/login`, `/chat`, Swagger);
 - `ingest.py` — загрузка и индексирование текстов из `chunks.json` в Qdrant;
 - `worker_http.py` — HTTP-воркер для запросов `/warmup` и `/ask`;
 - `rag.py` — RAG-пайплайн с гибридным поиском (BM25 + векторный поиск + ранжирование);
@@ -21,14 +21,16 @@
 
 ## Как это работает
 
-1. Клиент отправляет запрос в `aspnet-api`.
-2. ASP.NET пересылает запрос в Python-воркер по адресу `http://rag-api:9000`.
-3. Python-воркер сравнивает вопрос с документами:
+1. Клиент получает JWT через `POST /login` (логин и пароль).
+2. Клиент отправляет вопрос в `POST /chat` с заголовком `Authorization: Bearer <token>`.
+3. ASP.NET пересылает запрос в Python-воркер по адресу `http://rag-api:9000/ask`.
+4. Python-воркер сравнивает вопрос с документами:
    - BM25-поиск по текстам;
    - векторный поиск в Qdrant;
    - дополнительное ранжирование результатов.
-4. Сформированный контекст передаётся в LLM, который генерирует ответ.
-5. Если релевантной информации нет, возвращается `Нет информации в базе`.
+5. Сформированный контекст передаётся в LLM, который генерирует ответ.
+6. ASP.NET возвращает клиенту JSON с полями `messageID`, `content`, `timestamp`.
+7. Если релевантной информации нет, в `content` — сообщение для техподдержки; запрос может быть сохранён в MSSQL.
 
 ## Быстрый запуск
 
@@ -64,13 +66,47 @@ docker compose exec rag-api python3 ingest.py
 
 ## API
 
-### ASP.NET API
+### ASP.NET API (публичный шлюз)
 
-- `GET /health` — проверка работоспособности;
-- `POST /rag/warmup` — прогрев воркера и загрузка модели;
-- `POST /rag/ask` — запрос к RAG-движку.
+Документация в Swagger UI: **http://localhost:8080/swagger**
 
-Пример запроса:
+| Метод | Путь | Авторизация | Описание |
+|-------|------|-------------|----------|
+| `GET` | `/` | нет | Статус сервиса |
+| `GET` | `/health` | нет | Проверка связи с Python-воркером |
+| `POST` | `/login` | нет | Выдача JWT по логину и паролю |
+| `POST` | `/chat` | JWT (Bearer) | Запрос к RAG-движку |
+| `POST` | `/rag/warmup` | нет | Прогрев воркера и загрузка модели |
+
+#### Авторизация (JWT)
+
+Демо-пользователи (для разработки):
+
+| Логин | Пароль | Роль |
+|-------|--------|------|
+| `user` | `user123` | `user` |
+| `admin` | `admin123` | `admin` |
+
+Обе роли имеют доступ к `POST /chat`. Параметры JWT задаются в `aspnet-backend/appsettings.json` (секция `Jwt`: ключ, issuer, audience, время жизни токена).
+
+**1. Получить токен** — `POST /login`:
+
+```json
+{
+  "login": "user",
+  "password": "user123"
+}
+```
+
+Ответ:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**2. Задать вопрос** — `POST /chat` с заголовком `Authorization: Bearer <token>`:
 
 ```json
 {
@@ -78,19 +114,63 @@ docker compose exec rag-api python3 ingest.py
 }
 ```
 
-Пример с `curl.exe`:
+Ответ:
+
+```json
+{
+  "messageID": "a1b2c3d4e5f6...",
+  "content": "ДСЕ — деталь или сборочная единица...",
+  "timestamp": "2026-05-15T12:00:00.0000000Z"
+}
+```
+
+- `messageID` — уникальный идентификатор ответа (GUID без дефисов);
+- `content` — текст ответа или сообщение «обратитесь в техподдержку», если в базе нет информации;
+- `timestamp` — время ответа в UTC.
+
+Альтернатива: передать `query` в query-string, например `POST /chat?query=Что%20такое%20ДСЕ?` (тело может быть пустым).
+
+#### Примеры с curl (PowerShell)
+
+Прогрев воркера:
 
 ```powershell
 curl.exe -X POST http://localhost:8080/rag/warmup
-curl.exe -X POST http://localhost:8080/rag/ask -H "Content-Type: application/json" -d "{\"query\":\"Что такое ДСЕ?\"}"
 ```
 
-### Python worker API
+Вход и запрос в чат:
+
+```powershell
+# Токен
+$login = curl.exe -s -X POST http://localhost:8080/login `
+  -H "Content-Type: application/json" `
+  -d "{\"login\":\"user\",\"password\":\"user123\"}"
+$token = ($login | ConvertFrom-Json).token
+
+# Вопрос
+curl.exe -X POST http://localhost:8080/chat `
+  -H "Content-Type: application/json" `
+  -H "Authorization: Bearer $token" `
+  -d "{\"query\":\"Что такое ДСЕ?\"}"
+```
+
+#### Swagger и Postman
+
+1. Откройте **http://localhost:8080/swagger**.
+2. Выполните **POST /login**, скопируйте `token`.
+3. Нажмите **Authorize**, введите `Bearer <token>` (или только токен — в зависимости от версии UI).
+4. В **POST /chat** в теле запроса укажите поле `query` и выполните запрос.
+
+В Postman: отдельный запрос на `/login`, затем на `/chat` с типом авторизации **Bearer Token**.
+
+### Python worker API (внутренний)
 
 - `GET /` — сервис доступен;
 - `GET /health` — статус воркера;
 - `POST /warmup` — запуск и прогрев RAG-пайплайна;
-- `POST /ask` или `/rag/ask` — запрос к генерации.
+- `POST /ask` — запрос к генерации (вызывается из ASP.NET, не требует JWT клиента).
+
+Формат ответа воркера (`answer`, `contexts`) преобразуется шлюзом в `messageID` / `content` / `timestamp` для внешних клиентов.
 
 ## Переменные окружения
 
@@ -113,8 +193,9 @@ curl.exe -X POST http://localhost:8080/rag/ask -H "Content-Type: application/jso
 
 ## Хранение «неотвеченных» вопросов
 
-Если воркер не находит ответ, ASP.NET записывает запрос в базу `RagSupportRequests`.
-Это позволяет собирать вопросы для анализа и дальнейшего обучения.
+Если воркер не находит ответ, ASP.NET возвращает в `content` сообщение для техподдержки и при настроенной строке подключения `SupportDb` сохраняет запрос в таблицу `RagSupportRequests` в MSSQL. Это позволяет собирать вопросы для анализа и дальнейшего обучения.
+
+Строка подключения задаётся в `aspnet-backend/appsettings.json` → `ConnectionStrings:SupportDb` или через переменные окружения в `docker-compose.yml`.
 
 ## Тюнинг и параметры
 
@@ -141,6 +222,10 @@ docker compose exec rag-api python3 tune_params.py
 - `qdrant_storage/` — постоянное хранилище Qdrant;
 - `rag_test/models/` — локальный каталог моделей GGUF.
 
+## Тесты
+
+Скрипт `tests/test.py` использует `POST /login` и `POST /chat` с полем `content` в ответе. Перед запуском убедитесь, что подняты `aspnet-api` и `rag-api`.
+
 ---
 
-Если нужно, можно расширить README примерами `docker compose` для Windows и инструкциями по подготовке `chunks.json`.
+При необходимости README можно дополнить примерами подготовки `chunks.json` и настройкой production-секретов JWT (не использовать демо-ключ из `appsettings.json` в проде).

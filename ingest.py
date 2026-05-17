@@ -1,5 +1,3 @@
-# ingest.py
-
 import json
 
 from embeddings import EmbeddingService

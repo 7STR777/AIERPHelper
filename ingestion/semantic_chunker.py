@@ -3,9 +3,6 @@ import json
 import uuid
 from pathlib import Path
 
-# ==========================================================
-# CONFIG
-# ==========================================================
 INPUT_FILE = "Подготовка производства.md"
 OUTPUT_FILE = "chunks_output_v2.json"
 
@@ -13,9 +10,6 @@ MAX_TOKENS = 420          # безопасный размер чанка
 MIN_TOKENS = 80
 OVERLAP_SENTENCES = 1
 
-# ==========================================================
-# HELPERS
-# ==========================================================
 
 def estimate_tokens(text: str) -> int:
     # грубо: 1 токен ~ 0.75 слова
@@ -85,11 +79,6 @@ def split_sentences(text: str):
     sents = re.split(r'(?<=[.!?])\s+', text)
     return [s.strip() for s in sents if s.strip()]
 
-
-# ==========================================================
-# PARSE HEADERS
-# ==========================================================
-
 def parse_sections(md_text: str):
     """
     Делим по # ## ###
@@ -146,11 +135,6 @@ def parse_sections(md_text: str):
 
     return sections
 
-
-# ==========================================================
-# CHUNKING
-# ==========================================================
-
 def chunk_text(section):
     text = "\n".join(section["content"]).strip()
 
@@ -192,11 +176,6 @@ def chunk_text(section):
 
     return final_chunks
 
-
-# ==========================================================
-# GLOSSARY EXTRACTION
-# ==========================================================
-
 def extract_glossary(md_text):
     glossary = []
 
@@ -213,11 +192,6 @@ def extract_glossary(md_text):
             })
 
     return glossary
-
-
-# ==========================================================
-# MAIN
-# ==========================================================
 
 def build_chunks():
     md = Path(INPUT_FILE).read_text(encoding="utf-8")

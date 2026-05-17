@@ -1,24 +1,15 @@
-# ==========================================================
-# JUPYTER TEST FOR YOUR RAG API
-# обычный print
-# тема: документация "Подготовка производства"
-# ==========================================================
 
 import requests
 import re
 from llama_cpp import Llama
 
-# ==========================================================
-# CONFIG
-# ==========================================================
-
-RAG_URL = "http://localhost:8080/rag/ask"
+BASE_URL = "http://localhost:8080"
+LOGIN_URL = f"{BASE_URL}/login"
+CHAT_URL = f"{BASE_URL}/chat"
+LOGIN = "user"
+PASSWORD = "user123"
 
 LLM_MODEL_PATH = "rag_test/models/qwen2.5-3b-instruct-q4_k_m.gguf"
-
-# ==========================================================
-# LOAD LOCAL JUDGE MODEL
-# ==========================================================
 
 llm = Llama(
     model_path=LLM_MODEL_PATH,
@@ -27,12 +18,6 @@ llm = Llama(
     n_threads=8,
     verbose=False
 )
-
-# ==========================================================
-# TEST QUESTIONS
-# True = по теме документации
-# False = мусорный запрос
-# ==========================================================
 
 tests = [
 
@@ -53,25 +38,28 @@ tests = [
     {"query": "Какая погода завтра?", "topic": False},
 ]
 
-# ==========================================================
-# ASK API
-# ==========================================================
+def get_token():
+    r = requests.post(
+        LOGIN_URL,
+        json={"login": LOGIN, "password": PASSWORD},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["token"]
 
-def ask_rag(question):
+
+def ask_rag(question, token):
     try:
         r = requests.post(
-            RAG_URL,
+            CHAT_URL,
             json={"query": question},
-            timeout=60
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=60,
         )
-        return r.json()["answer"]
+        return r.json()["content"]
 
     except Exception as e:
         return f"ERROR: {e}"
-
-# ==========================================================
-# LLM JUDGE
-# ==========================================================
 
 def judge_answer(question, answer):
     prompt = f"""
@@ -106,10 +94,6 @@ def judge_answer(question, answer):
 
     return 0
 
-# ==========================================================
-# RUN TEST
-# ==========================================================
-
 good_scores = []
 fallback_ok = 0
 fallback_total = 0
@@ -118,6 +102,8 @@ print("=" * 70)
 print("START RAG TEST")
 print("=" * 70)
 
+token = get_token()
+
 for i, test in enumerate(tests, 1):
 
     q = test["query"]
@@ -125,22 +111,16 @@ for i, test in enumerate(tests, 1):
 
     print(f"\n{i}. QUESTION: {q}")
 
-    answer = ask_rag(q)
+    answer = ask_rag(q, token)
 
     print("ANSWER:")
     print(answer)
 
-    # -----------------------------------------
-    # тематический запрос
-    # -----------------------------------------
     if topic:
         score = judge_answer(q, answer)
         good_scores.append(score)
         print("LLM SCORE:", score, "/5")
 
-    # -----------------------------------------
-    # не тематический запрос
-    # -----------------------------------------
     else:
         fallback_total += 1
 
@@ -152,9 +132,6 @@ for i, test in enumerate(tests, 1):
         else:
             print("FALLBACK: FAIL")
 
-# ==========================================================
-# FINAL REPORT
-# ==========================================================
 
 print("\n" + "=" * 70)
 print("FINAL REPORT")

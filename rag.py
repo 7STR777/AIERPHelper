@@ -22,28 +22,18 @@ class RAGPipeline:
         self.db = VectorDB(QDRANT_HOST, QDRANT_PORT, COLLECTION_NAME)
         self.llm = QwenLLM()
 
-        # NEW: BM25 + reranker
         self.bm25 = BM25Retriever(chunks)
         self.reranker = Reranker()
 
         self.chunks = chunks
 
-    # -------------------------
-    # TOKENIZE
-    # -------------------------
     def _tokens(self, text: str):
         return re.findall(r"\w+", text.lower())
 
-    # -------------------------
-    # VECTOR SEARCH
-    # -------------------------
     def _vector_search(self, query: str, k: int = 20):
         q_vec = self.embedder.embed_query(query)
         return self.db.search(q_vec, limit=k)
 
-    # -------------------------
-    # HYBRID MERGE
-    # -------------------------
     def retrieve(self, query: str, k: int = 20):
         # BM25
         bm25_docs = self.bm25.search(query, k=10)
@@ -68,9 +58,6 @@ class RAGPipeline:
 
         return unique[:20]
 
-    # -------------------------
-    # SOFT GATE
-    # -------------------------
     def _is_relevant(self, query: str, docs: list[str]) -> bool:
         if not docs:
             return False
@@ -86,12 +73,8 @@ class RAGPipeline:
         hits = sum(1 for t in q if t in text)
         ratio = hits / len(q)
 
-        # 🔥 NEW: мягкий gate
         return hits >= 1 or ratio >= 0.10
 
-    # -------------------------
-    # CONTEXT
-    # -------------------------
     def _build_context(self, docs: list[str], max_chars: int):
         out, total = [], 0
 
@@ -104,9 +87,6 @@ class RAGPipeline:
 
         return "\n\n".join(out)
 
-    # -------------------------
-    # PROMPT
-    # -------------------------
     def _prompt(self, context: str, query: str):
         return f"""<|im_start|>system
 Ты - корпоративный ассистент. Отвечай СТРОГО на основе предоставленного контекста. Если в контексте нет ответа, скажи: {NO_INFO}. Отвечай только на русском языке.<|im_end|>
@@ -120,9 +100,6 @@ class RAGPipeline:
 <|im_start|>assistant
 """
 
-    # -------------------------
-    # CLEAN
-    # -------------------------
     def _clean(self, text: str):
         if not text:
             return NO_INFO
@@ -157,15 +134,11 @@ class RAGPipeline:
         
         return text
 
-    # -------------------------
-    # GENERATE
-    # -------------------------
     def generate(self, query: str):
         t0 = time.perf_counter()
 
         docs = self.retrieve(query, k=10)
 
-        # reranker stage (🔥 KEY UPGRADE)
         docs = docs[:10]
         docs = self.reranker.rank(query, docs, top_k=5)
 

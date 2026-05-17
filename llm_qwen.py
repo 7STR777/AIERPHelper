@@ -32,7 +32,6 @@ def resolve_model_path(model_path: str) -> str:
     if not files:
         raise FileNotFoundError(f"No .gguf files found in {model_dir}")
 
-    # Prefer Qwen 3B instruct quantized files if present.
     ranked = sorted(
         files,
         key=lambda p: (

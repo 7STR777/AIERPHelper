@@ -1,4 +1,3 @@
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -12,30 +11,24 @@ dist/
 build/
 *.egg
 
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
 .DS_Store
 Thumbs.db
 Desktop.ini
 
-# Кэши и модели (НЕ должны быть в Git)
 hf_cache/
 models/
 *.gguf
 
-# Qdrant storage
 qdrant_storage/
 
-# Docker
 docker-compose.override.yml
 
-# .NET build artifacts
 aspnet-backend/bin/
 aspnet-backend/obj/
 *.user
@@ -45,29 +38,21 @@ aspnet-backend/obj/
 *.exe
 *.pdb
 
-# Node (если есть)
 node_modules/
 
-# Логи
 *.log
 logs/
 
-# Временные файлы
 tmp/
 temp/
 *.tmp
 
-# Конвертированные файлы (если они генерируются)
-
-# Environment файлы с секретами
 .env
 .env.local
 .env.*.local
 
-# Jupyter
 .ipynb_checkpoints/
 
-# Тестовые артефакты
 .pytest_cache/
 .coverage
 htmlcov/
