@@ -227,5 +227,3 @@ docker compose exec rag-api python3 tune_params.py
 Скрипт `tests/test.py` использует `POST /login` и `POST /chat` с полем `content` в ответе. Перед запуском убедитесь, что подняты `aspnet-api` и `rag-api`.
 
 ---
-
-При необходимости README можно дополнить примерами подготовки `chunks.json` и настройкой production-секретов JWT (не использовать демо-ключ из `appsettings.json` в проде).
