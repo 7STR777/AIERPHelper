@@ -1,0 +1,66 @@
+<section class="chat-window" aria-label="Окно чата">
+  <div class="chat-header">
+    <div class="chat-header__icon" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <rect x="3" y="11" width="3" height="10" rx="1"/><rect x="9" y="7" width="3" height="14" rx="1"/><rect x="15" y="4" width="3" height="17" rx="1"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="chat-header__title">КАИ — Консультант по ERP</h1>
+      <p class="chat-header__sub">Система: ГСТ АУРА&nbsp;·&nbsp;Всегда готов помочь</p>
+    </div>
+    <div class="chat-header__status" aria-label="Статус: онлайн">
+      <span class="status-dot"></span>онлайн
+    </div>
+  </div>
+
+  <div
+    class="messages"
+    #messagesContainer
+    role="log"
+    aria-live="polite"
+    aria-label="История сообщений"
+  >
+    @if (chatState.messages().length === 0) {
+      <div class="welcome">
+        <div class="welcome__icon" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <h2 class="welcome__title">Здравствуйте!</h2>
+        <p class="welcome__text">
+          Я КАИ — ваш помощник по работе с ERP-системой ГСТ АУРА.
+          Задайте вопрос или выберите одну из частых тем ниже.
+        </p>
+      </div>
+    }
+
+    @for (msg of chatState.messages(); track msg.id) {
+      <app-message-bubble
+        [message]="msg"
+        (rated)="onRating(msg.id, $event)"
+      />
+    }
+
+    @if (chatState.isLoading()) { <app-typing-indicator /> }
+
+    @if (chatState.error()) {
+      <div class="error-banner" role="alert">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        {{ chatState.error() }}
+      </div>
+    }
+
+    <div #messagesEnd></div>
+  </div>
+
+  <div class="chat-footer">
+    @if (chatState.messages().length === 0) {
+      <app-quick-actions (selected)="onQuickAction($event)" />
+    }
+    <app-message-input [disabled]="chatState.isLoading()" (sent)="onSend($event)" />
+  </div>
+</section>

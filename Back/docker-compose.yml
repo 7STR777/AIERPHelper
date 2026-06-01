@@ -1,0 +1,81 @@
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrong!Passw0rd"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+
+  rag-api:
+    build: .
+    command: ["python3", "worker_http.py"]
+    depends_on:
+      - qdrant
+    environment:
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      COLLECTION_NAME: new_rag_collection
+      EMBEDDING_MODEL: BAAI/bge-m3
+      EMBEDDING_DEVICE: cuda
+      HF_HOME: /root/.cache/huggingface
+      CHUNKS_PATH: /app/chunks.json
+      SENTENCE_TRANSFORMERS_HOME: /root/.cache/huggingface
+      LLM_MODEL_PATH: /models/qwen2.5-3b-instruct-q4_k_m.gguf
+      LLM_GPU_LAYERS: -1
+      LLM_N_CTX: 1536
+      LLM_MAX_TOKENS: 120
+      LLM_TEMPERATURE: 0.05
+      LLM_TOP_P: 0.8
+      LLM_TOP_K: 40
+      LLM_REPEAT_PENALTY: 1.2
+      LLM_N_BATCH: 256
+      LLM_N_UBATCH: 256
+      LLM_N_THREADS: 8
+      LLM_FLASH_ATTN: "true"
+      LLM_VERBOSE: "true"
+      RAG_TOP_K: 4
+      RAG_MAX_CONTEXT_CHARS: 2600
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: 9000
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./:/app
+      - ./rag_test/models:/models
+      - ./hf_cache:/root/.cache/huggingface
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  aspnet-api:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    working_dir: /src
+    depends_on:
+      - rag-api
+      - mssql
+    environment:
+      Rag__BaseUrl: http://rag-api:9000
+      Rag__TimeoutSeconds: 900
+      ConnectionStrings__SupportDb: "Server=mssql,1433;Database=RagSupport;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;"
+    command: ["dotnet", "run", "--urls", "http://0.0.0.0:8080", "--no-launch-profile"]
+    volumes:
+      - ./aspnet-backend:/src
+    ports:
+      - "8080:8080"
+
+volumes:
+  mssql_data:

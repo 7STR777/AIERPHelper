@@ -1,0 +1,198 @@
+.login-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+  position: relative;
+}
+
+.login-theme-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--color-bg-3);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-2);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  transition: color 0.2s, background 0.2s;
+
+  &:hover {
+    color: var(--color-accent-2);
+    background: var(--color-bg-hover);
+  }
+}
+
+.session-banner {
+  width: 100%;
+  max-width: 280px;
+  color: var(--color-text-3);
+  font-size: 12px;
+  margin-bottom: 4px;
+  padding: 0 4px;
+}
+
+.login-card {
+  width: 280px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+
+  &__top {
+    height: 120px; // пустая область как в макете (место под будущий баннер/изображение)
+    background: var(--color-bg-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  &__title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-accent-2);
+    text-align: center;
+    padding: 20px 24px 12px;
+  }
+
+  &__logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 0 20px;
+    border-top: 1px solid var(--color-border);
+    margin-top: 8px;
+  }
+
+  &__logo-text {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--color-text-2);
+    text-transform: uppercase;
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px;
+}
+
+// ── Поле ввода (стиль как в макете с плавающим лейблом) ───
+.field {
+  position: relative;
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-3);
+  transition: border-color 0.18s;
+
+  &:focus-within {
+    border-color: var(--color-accent-2);
+  }
+
+  &__label {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--color-text-3);
+    pointer-events: none;
+    transition: all 0.18s;
+  }
+
+  &--filled &__label,
+  &:focus-within &__label {
+    top: 6px;
+    transform: none;
+    font-size: 10px;
+    color: var(--color-text-2);
+  }
+
+  &__input {
+    width: 100%;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--color-text);
+    font-size: 13px;
+    font-family: var(--font-main);
+    padding: 18px 12px 6px;
+
+    &::placeholder { color: transparent; }
+    &:disabled { opacity: 0.6; cursor: not-allowed; }
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+  }
+
+  &__row &__input {
+    flex: 1;
+  }
+
+  &__eye {
+    background: none;
+    border: none;
+    color: var(--color-text-3);
+    cursor: pointer;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    transition: color 0.18s;
+
+    &:hover { color: var(--color-accent-2); }
+  }
+}
+
+.login-error {
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-error);
+  font-size: 12px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 11px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: var(--font-main);
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.18s;
+  margin-bottom: 4px;
+
+  &:hover:not(:disabled) { background: var(--color-accent-hover); }
+  &:disabled { opacity: 0.7; cursor: not-allowed; }
+
+  &__spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

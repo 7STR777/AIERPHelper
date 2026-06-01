@@ -1,0 +1,120 @@
+<div class="login-page">
+  <button
+    class="login-theme-btn"
+    type="button"
+    (click)="toggleTheme()"
+    [title]="theme() === 'dark' ? 'Светлая тема' : 'Тёмная тема'"
+    [attr.aria-label]="theme() === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'"
+  >
+    @if (theme() === 'dark') {
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    } @else {
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    }
+  </button>
+
+  <div class="login-card">
+    
+
+    <h1 class="login-card__title">Вход в систему</h1>
+
+    <form class="login-form" (ngSubmit)="onSubmit()" novalidate>
+
+      <div class="field" [class.field--filled]="login">
+        <label class="field__label" for="login-input">Имя пользователя</label>
+        <input
+          id="login-input"
+          class="field__input"
+          type="text"
+          [(ngModel)]="login"
+          name="login"
+          autocomplete="username"
+          [disabled]="loading()"
+        >
+      </div>
+
+      <div class="field" [class.field--filled]="password">
+        <label class="field__label" for="pass-input">Пароль</label>
+        <div class="field__row">
+          <input
+            id="pass-input"
+            class="field__input"
+            [type]="showPassword ? 'text' : 'password'"
+            [(ngModel)]="password"
+            name="password"
+            autocomplete="current-password"
+            [disabled]="loading()"
+          >
+          <button
+            type="button"
+            class="field__eye"
+            (click)="showPassword = !showPassword"
+            [attr.aria-label]="showPassword ? 'Скрыть пароль' : 'Показать пароль'"
+          >
+            @if (!showPassword) {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            } @else {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            }
+          </button>
+        </div>
+      </div>
+
+      @if (error()) {
+        <div class="login-error" role="alert">{{ error() }}</div>
+      }
+
+      <button class="login-btn" type="submit" [disabled]="loading()">
+        @if (loading()) {
+          <span class="login-btn__spinner"></span> Вход...
+        } @else {
+          Войти в систему
+        }
+      </button>
+
+    </form>
+
+    <div class="login-card__logo">
+      <svg width="60" height="40" viewBox="0 0 160 104" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Логотип ГСТ АУРА">
+        <path d="M81.6859 0L131 37H15L81.6859 0Z" fill="#244E9C"/>
+        <path d="M112.116 11L152 37H54L112.116 11Z" fill="#244E9C"/>
+        <path d="M37.0431 15L68 37H5L37.0431 15Z" fill="#244E9C"/>
+        <path d="M80.8182 10.8293H76.841L80.25 7.90243L81.9546 4L99 17.1707L83.6591 24V19.6098L81.3864 17.6586L74 18.6341L79.6818 15.7073L80.8182 10.8293Z" fill="white"/>
+        <path d="M39.2608 20L61 37H51.2175L46.8697 34.4999L43.0652 33L44.6957 32.5L41.9783 29H39.2608V25.9999L36 25L38.174 23L39.2608 20Z" fill="white"/>
+        <path d="M111.971 19.8182L113.043 16L142 37H122.159L119.478 34.1364L121.087 33.1818L119.478 31.75L111.435 30.7955L115.725 26.0228L111.435 23.6363L105 24.1136L111.971 19.8182Z" fill="white"/>
+        <g filter="url(#f1)">
+          <path d="M7.275 96L7.275 43.5H36.9V52.125H16.5L16.5 96H7.275ZM79.7602 84L83.2852 90.9C79.9852 94.425 73.3102 96.825 66.4852 96.825C50.4352 96.825 39.4102 86.1 39.4102 69.75C39.4102 54.675 48.9352 42.675 66.2602 42.675C73.0852 42.675 78.7852 44.85 82.2352 48L78.1102 54.825C74.9602 52.725 71.5102 51.3 66.2602 51.3C56.5102 51.3 49.1602 58.35 49.1602 69.75C49.1602 80.7 56.5852 88.2 67.3102 88.2C71.7352 88.2 76.1602 86.775 79.7602 84ZM85.9307 52.125V43.5L129.206 43.5V52.125L112.181 52.125V96H102.956V52.125H85.9307Z" fill="url(#g1)"/>
+        </g>
+        <defs>
+          <filter id="f1" x="3.275" y="41.675" width="129.931" height="62.15" filterUnits="userSpaceOnUse">
+            <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+            <feOffset dy="3"/><feGaussianBlur stdDeviation="2"/>
+            <feComposite in2="hardAlpha" operator="out"/>
+            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1"/>
+            <feBlend mode="normal" in="SourceGraphic" in2="effect1" result="shape"/>
+          </filter>
+          <linearGradient id="g1" x1="45.9756" y1="58.2712" x2="46.8374" y2="91.9356" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#244E9C"/>
+            <stop offset="0.809586" stop-color="#1394D6"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="login-card__logo-text">АУРА</span>
+    </div>
+  </div>
+</div>

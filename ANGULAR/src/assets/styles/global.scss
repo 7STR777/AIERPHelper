@@ -1,0 +1,132 @@
+// ============================================================
+// ГЛОБАЛЬНЫЕ СТИЛИ — ГСТ АУРА ДИЗАЙН-СИСТЕМА
+// ============================================================
+
+// ── Переменные (тёмная тема по умолчанию) ───────────────────
+:root,
+[data-theme='dark'] {
+  --color-bg:        #111318;
+  --color-bg-2:      #1a1e27;
+  --color-bg-3:      #222736;
+  --color-bg-hover:  #2a3045;
+  --color-bg-card:   #1e2230;
+
+  --color-accent:    #2563eb;
+  --color-accent-2:  #3b82f6;
+  --color-accent-3:  rgba(37, 99, 235, 0.15);
+  --color-accent-hover: #1d4ed8;
+
+  --color-text:      #e8eaf0;
+  --color-text-2:    #8b93a8;
+  --color-text-3:    #5a6278;
+
+  --color-border:    rgba(100, 120, 180, 0.18);
+  --color-border-2:  rgba(100, 120, 200, 0.35);
+
+  --color-on-accent: #ffffff;
+  --color-error-bg:  rgba(239, 68, 68, 0.1);
+  --color-error-border: rgba(239, 68, 68, 0.3);
+  --color-scrollbar-hover: rgba(100, 120, 200, 0.5);
+
+  --color-success:   #22c55e;
+  --color-warning:   #f59e0b;
+  --color-error:     #ef4444;
+
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+
+  --header-height:  54px;
+  --footer-height:  36px;
+  --sidebar-width:  240px;
+
+  --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+[data-theme='light'] {
+  --color-bg:        #f0f2f8;
+  --color-bg-2:      #ffffff;
+  --color-bg-3:      #e8ecf4;
+  --color-bg-hover:  #dce3f0;
+  --color-bg-card:   #ffffff;
+
+  --color-accent:    #2563eb;
+  --color-accent-2:  #1d4ed8;
+  --color-accent-3:  rgba(37, 99, 235, 0.12);
+  --color-accent-hover: #1e40af;
+
+  --color-text:      #141824;
+  --color-text-2:    #4a5568;
+  --color-text-3:    #718096;
+
+  --color-border:    rgba(30, 50, 100, 0.12);
+  --color-border-2:  rgba(30, 50, 100, 0.22);
+
+  --color-on-accent: #ffffff;
+  --color-error-bg:  rgba(239, 68, 68, 0.08);
+  --color-error-border: rgba(239, 68, 68, 0.25);
+  --color-scrollbar-hover: rgba(30, 50, 100, 0.28);
+
+  --color-success:   #16a34a;
+  --color-warning:   #d97706;
+  --color-error:     #dc2626;
+}
+
+// ── Сброс стилей ───────────────────────────────────────────
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+app-root {
+  display: block;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-main);
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+// ── Скроллбары ─────────────────────────────────────────────
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-2);
+  border-radius: 3px;
+  &:hover { background: var(--color-scrollbar-hover); }
+}
+
+// ── Утилиты ────────────────────────────────────────────────
+.text-secondary { color: var(--color-text-2); }
+.text-accent    { color: var(--color-accent-2); }
+.text-success   { color: var(--color-success); }
+.text-error     { color: var(--color-error); }
+
+// ── Анимации ───────────────────────────────────────────────
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.25s ease forwards;
+}

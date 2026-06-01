@@ -1,0 +1,43 @@
+<aside class="sidebar">
+  <div class="sidebar__top">
+    <button class="new-chat-btn" (click)="newChat()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Новый чат
+    </button>
+  </div>
+
+  <nav class="sidebar__nav" aria-label="Навигация">
+    <p class="sidebar__label">Меню</p>
+    <a class="nav-item" routerLink="/chat" routerLinkActive="nav-item--active">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Чат с КАИ
+    </a>
+  </nav>
+
+  @if (sessions().length > 0) {
+    <div class="sidebar__sessions">
+      <p class="sidebar__label">Диалоги</p>
+      @for (session of sessions(); track session.id) {
+        <div
+          class="session-item"
+          [class.session-item--active]="session.id === activeSessionId()"
+          (click)="selectSession(session.id)"
+          role="button"
+          [attr.aria-label]="'Открыть диалог: ' + session.title"
+        >
+          <div class="session-item__title">{{ session.title }}</div>
+          <div class="session-item__meta">{{ formatDate(session.updatedAt) }}</div>
+          <button class="session-item__delete" (click)="deleteSession($event, session.id)" aria-label="Удалить диалог" title="Удалить">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      }
+    </div>
+  }
+</aside>

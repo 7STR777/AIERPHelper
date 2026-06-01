@@ -1,0 +1,56 @@
+<div class="msg" [class.msg--user]="message().role === 'user'" [class.msg--bot]="message().role === 'bot'">
+
+  <div class="msg__avatar" [class.msg__avatar--bot]="message().role === 'bot'" [class.msg__avatar--user]="message().role === 'user'" aria-hidden="true">
+    @if (message().role === 'bot') { <span>КАИ</span> }
+    @else {
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+    }
+  </div>
+
+  <div class="msg__content">
+    <div class="msg__bubble">{{ message().content }}</div>
+    <div class="msg__meta">
+      <span class="msg__time">{{ message().timestamp | date:'HH:mm' }}</span>
+
+      @if (message().role === 'user' && message().status === 'error') {
+        <span class="msg__status--error">ошибка отправки</span>
+      }
+
+      <!-- Кнопки оценки — только для ответов бота -->
+      @if (message().role === 'bot') {
+        <div class="msg__rating" role="group" aria-label="Оценить ответ">
+          @if (message().rating === null || message().rating === undefined) {
+            <button class="rating-btn" (click)="rate('good')" title="Полезный ответ" aria-label="Полезный ответ">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+                <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+              </svg>
+            </button>
+            <button class="rating-btn rating-btn--bad" (click)="rate('bad')" title="Неточный ответ" aria-label="Неточный ответ">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
+                <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+              </svg>
+            </button>
+          } @else if (message().rating === 'good') {
+            <span class="rating-result rating-result--good" aria-label="Отмечено как полезный">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+              </svg>
+              Полезно
+            </span>
+          } @else {
+            <span class="rating-result rating-result--bad" aria-label="Отмечено как неточный">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
+              </svg>
+              Направлено в поддержку
+            </span>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

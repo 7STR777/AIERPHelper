@@ -1,0 +1,14 @@
+numpy==1.26.4
+rank-bm25==0.2.2
+qdrant-client==1.9.0
+
+sentence-transformers==2.7.0
+transformers==4.41.2
+huggingface-hub
+
+scikit-learn==1.4.2
+scipy==1.11.4
+
+tqdm
+fastapi
+uvicorn
