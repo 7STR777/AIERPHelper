@@ -1,154 +1,203 @@
 # RAG проект на Python + ASP.NET + Qdrant
 
 Этот проект реализует RAG-пайплайн для корпоративной информационной системы:
-- `aspnet-backend` — публичный API на ASP.NET (JWT, Swagger, `/login`, `/chat`);
+- `aspnet-backend` — публичный API на ASP.NET (JWT, Swagger, эндпоинты `/login` и `/chat`);
 - `rag-api` — Python-воркер, выполняет поиск по векторной базе и подставляет контекст в LLM;
 - `qdrant` — хранилище векторных эмбеддингов;
-- `mssql` — хранилище всех вопросов, на которые модель не смогла ответить;
-- `ANGULAR` — фронтенд-приложение проекта, клиентская часть чата.
+- `mssql` — хранилище неответов для дальнейшей обработки.
 
-## Фронтенд (ANGULAR)
+## Структура проекта
 
-Папка `ANGULAR` содержит Angular-приложение, которое работает как веб-интерфейс для чата.
+- `docker-compose.yml` — основная конфигурация для запуска всех сервисов;
+- `Dockerfile` — образ для Python-воркера;
+- `aspnet-backend/` — API-шлюз на .NET 8.0 (`/login`, `/chat`, Swagger);
+- `ingest.py` — загрузка и индексирование текстов из `chunks.json` в Qdrant;
+- `worker_http.py` — HTTP-воркер для запросов `/warmup` и `/ask`;
+- `rag.py` — RAG-пайплайн с гибридным поиском (BM25 + векторный поиск + ранжирование);
+- `vector_db.py` — клиент для Qdrant;
+- `embeddings.py` — сервис эмбеддингов;
+- `llm_qwen.py` — генерация ответов через локальную модель GGUF;
+- `chunks.json` — источник текстовых фрагментов для индексации.
 
-Основные команды запуска фронтенда из папки `ANGULAR`:
+## Как это работает
 
-```powershell
-cd ANGULAR
-npm install
-npm start
-```
+1. Клиент получает JWT через `POST /login` (логин и пароль).
+2. Клиент отправляет вопрос в `POST /chat` с заголовком `Authorization: Bearer <token>`.
+3. ASP.NET пересылает запрос в Python-воркер по адресу `http://rag-api:9000/ask`.
+4. Python-воркер сравнивает вопрос с документами:
+   - BM25-поиск по текстам;
+   - векторный поиск в Qdrant;
+   - дополнительное ранжирование результатов.
+5. Сформированный контекст передаётся в LLM, который генерирует ответ.
+6. ASP.NET возвращает клиенту JSON с полями `messageID`, `content`, `timestamp`.
+7. Если релевантной информации нет, в `content` — сообщение для техподдержки; запрос может быть сохранён в MSSQL.
 
-По умолчанию приложение доступно на `http://localhost:4200`.
-
-Перед запуском убедитесь, что в `src/environments/environment.ts` указан бэкенд:
-
-```typescript
-apiUrl: 'http://localhost:8080',
-```
-
-В `ANGULAR/src/app/core/services/chat-api.service.ts` и `ANGULAR/src/app/core/services/auth.service.ts` должен быть отключён мок-сервер (`USE_MOCK = false`).
-
-## Быстрая последовательность действий
-
-1. Конвертируйте PDF в Markdown через модуль `convert_into_md`.
-2. Запустите семантическое чанкирование в модуле `ingestion`.
-3. Создайте эмбеддинги и загрузите данные в Qdrant командой:
-   - `docker compose exec -e RECREATE_COLLECTION=true rag-api python3 ingest.py`
-4. Соберите контейнеры:
-   - `docker compose up -d --build`
-5. Запустите сервисы:
-   - `docker compose up`
-
-> Рабочая директория для команд должна быть `Back/`.
-
-## 1. Конвертация PDF → Markdown
-
-Файлы для конвертации находятся в папке `Back/convert_into_md`.
-
-Пример текущего скрипта:
-- `Back/convert_into_md/convert_from_pdf_to_md.py`
-
-Он конвертирует PDF в Markdown и сохраняет результат как `.md`.
-
-Запуск:
-
-```powershell
-cd Back
-python convert_into_md/convert_from_pdf_to_md.py
-```
-
-Если в скрипте указан путь к PDF и MD, замените их на нужные файлы.
-
-## 2. Семантическое чанкирование
-
-Модуль `Back/ingestion/semantic_chunker.py` берет сгенерированный Markdown и разбивает его на семантические чанки.
-
-Запуск:
-
-```powershell
-cd Back
-python ingestion/semantic_chunker.py
-```
-
-После выполнения будет создан файл:
-- `Back/chunks_output_v2.json`
-
-Этот файл содержит сегменты текста, готовые для дальнейшей обработки и индексации.
-
-## 3. Создание эмбеддингов в Qdrant
-
-После генерации `chunks_output_v2.json` нужно загрузить данные в Qdrant.
-
-Запустите из папки `Back`:
-
-```powershell
-docker compose exec -e RECREATE_COLLECTION=true rag-api python3 ingest.py
-```
-
-Эта команда:
-- пересоздает коллекцию в Qdrant,
-- строит эмбеддинги для чанков,
-- сохраняет точки в векторную базу.
-
-## 4. Сборка контейнеров
-
-Для полной пересборки сервисов выполните:
+## Быстрый запуск
 
 ```powershell
 docker compose up -d --build
 ```
 
-Это собирает и запускает контейнеры в фоне.
+После старта сервисы будут доступны на портах:
+- `localhost:8080` — ASP.NET API;
+- `localhost:6333` — Qdrant;
+- `localhost:1433` — MSSQL.
 
-## 5. Запуск сервисов
-
-После сборки запустите сервисы (без пересборки):
+## Запуск без пересборки (dev loop)
 
 ```powershell
-docker compose up
+docker compose up -d --force-recreate rag-api aspnet-api
 ```
 
-## Порты сервисов
+Особенности:
+- `rag-api` монтирует текущую директорию в контейнер;
+- `aspnet-api` запускает проект из `./aspnet-backend`;
+- кеш HuggingFace сохраняется в `./hf_cache`.
 
-После запуска сервисы доступны на следующих портах:
-- `localhost:8080` — ASP.NET API (`aspnet-api`);
-- `localhost:6333` — Qdrant (`qdrant`);
-- `localhost:1433` — MSSQL (`mssql`);
-- `rag-api` слушает `9000` внутри Docker-кластера.
-- `localhost:80` — веб-интерфейс 
+## Индексирование данных
 
-## Что сохраняется в MSSQL
+Перед запуском поиска нужно загрузить тексты в Qdrant:
 
-Все вопросы, на которые модель не смогла дать ответ, сохраняются в MSSQL. Это позволяет анализировать и обрабатывать неотвеченные запросы позже.
+```powershell
+docker compose exec rag-api python3 ingest.py
+```
 
-Строка подключения к MSSQL указывается в `aspnet-backend/appsettings.json` и в `Back/docker-compose.yml` как `ConnectionStrings__SupportDb`.
+В `ingest.py` читается `chunks.json`, строятся эмбеддинги и сохраняются точки с полем `text`, `summary`, `keywords`, `questions`, `entities`.
 
-## Запуск и проверка
+## API
 
-1. Убедитесь, что PDF преобразован в `.md`.
-2. Убедитесь, что был выполнен `semantic_chunker.py`.
-3. Выполните `docker compose exec -e RECREATE_COLLECTION=true rag-api python3 ingest.py`.
-4. Соберите контейнеры: `docker compose up -d --build`.
-5. Запустите сервисы: `docker compose up`.
-6. Проверьте Swagger:
-   - `http://localhost:8080/swagger`
-   или
-   - `http://localhost:80/chat`
+### ASP.NET API (публичный шлюз)
 
-## Основные файлы
+Документация в Swagger UI: **http://localhost:8080/swagger**
 
-- `Back/docker-compose.yml` — конфигурация сервисов `rag-api`, `aspnet-api`, `qdrant`, `mssql`.
-- `Back/ingest.py` — загрузка и индексирование текстов в Qdrant.
-- `Back/worker_http.py` — HTTP-воркер, отвечающий на запросы `/warmup` и `/ask`.
-- `Back/convert_into_md/convert_from_pdf_to_md.py` — конвертация PDF → Markdown.
-- `Back/ingestion/semantic_chunker.py` — семантическое чанкирование Markdown.
-- `Back/rag.py` — RAG-пайплайн с поиском и ранжированием.
-- `Back/aspnet-backend/` — ASP.NET API-шлюз.
+| Метод | Путь | Авторизация | Описание |
+|-------|------|-------------|----------|
+| `GET` | `/` | нет | Статус сервиса |
+| `GET` | `/health` | нет | Проверка связи с Python-воркером |
+| `POST` | `/login` | нет | Выдача JWT по логину и паролю |
+| `POST` | `/chat` | JWT (Bearer) | Запрос к RAG-движку |
+| `POST` | `/rag/warmup` | нет | Прогрев воркера и загрузка модели |
 
----
+#### Авторизация (JWT)
 
-Если нужно, могу также добавить пример запуска запроса через `curl` или данные по точному формату `chunks_output_v2.json`.
+Демо-пользователи (для разработки):
+
+| Логин | Пароль | Роль |
+|-------|--------|------|
+| `user` | `user123` | `user` |
+| `admin` | `admin123` | `admin` |
+
+Обе роли имеют доступ к `POST /chat`. Параметры JWT задаются в `aspnet-backend/appsettings.json` (секция `Jwt`: ключ, issuer, audience, время жизни токена).
+
+**1. Получить токен** — `POST /login`:
+
+```json
+{
+  "login": "user",
+  "password": "user123"
+}
+```
+
+Ответ:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**2. Задать вопрос** — `POST /chat` с заголовком `Authorization: Bearer <token>`:
+
+```json
+{
+  "query": "Что такое ДСЕ?"
+}
+```
+
+Ответ:
+
+```json
+{
+  "messageID": "a1b2c3d4e5f6...",
+  "content": "ДСЕ — деталь или сборочная единица...",
+  "timestamp": "2026-05-15T12:00:00.0000000Z"
+}
+```
+
+- `messageID` — уникальный идентификатор ответа (GUID без дефисов);
+- `content` — текст ответа или сообщение «обратитесь в техподдержку», если в базе нет информации;
+- `timestamp` — время ответа в UTC.
+
+Альтернатива: передать `query` в query-string, например `POST /chat?query=Что%20такое%20ДСЕ?` (тело может быть пустым).
+
+#### Примеры с curl (PowerShell)
+
+Прогрев воркера:
+
+```powershell
+curl.exe -X POST http://localhost:8080/rag/warmup
+```
+
+Вход и запрос в чат:
+
+```powershell
+# Токен
+$login = curl.exe -s -X POST http://localhost:8080/login `
+  -H "Content-Type: application/json" `
+  -d "{\"login\":\"user\",\"password\":\"user123\"}"
+$token = ($login | ConvertFrom-Json).token
+
+# Вопрос
+curl.exe -X POST http://localhost:8080/chat `
+  -H "Content-Type: application/json" `
+  -H "Authorization: Bearer $token" `
+  -d "{\"query\":\"Что такое ДСЕ?\"}"
+```
+
+#### Swagger и Postman
+
+1. Откройте **http://localhost:8080/swagger**.
+2. Выполните **POST /login**, скопируйте `token`.
+3. Нажмите **Authorize**, введите `Bearer <token>` (или только токен — в зависимости от версии UI).
+4. В **POST /chat** в теле запроса укажите поле `query` и выполните запрос.
+
+В Postman: отдельный запрос на `/login`, затем на `/chat` с типом авторизации **Bearer Token**.
+
+### Python worker API (внутренний)
+
+- `GET /` — сервис доступен;
+- `GET /health` — статус воркера;
+- `POST /warmup` — запуск и прогрев RAG-пайплайна;
+- `POST /ask` — запрос к генерации (вызывается из ASP.NET, не требует JWT клиента).
+
+Формат ответа воркера (`answer`, `contexts`) преобразуется шлюзом в `messageID` / `content` / `timestamp` для внешних клиентов.
+
+## Переменные окружения
+
+Настройки читаются из `config.py` и могут переопределяться через env:
+
+- `QDRANT_HOST`, `QDRANT_PORT`, `COLLECTION_NAME`
+- `EMBEDDING_MODEL`, `EMBEDDING_DEVICE`
+- `LLM_MODEL_PATH`, `LLM_GPU_LAYERS`, `LLM_N_CTX`, `LLM_MAX_TOKENS`
+- `LLM_TEMPERATURE`, `LLM_TOP_P`, `LLM_TOP_K`, `LLM_REPEAT_PENALTY`
+- `RAG_TOP_K`, `RAG_MAX_CONTEXT_CHARS`
+- `WORKER_HOST`, `WORKER_PORT`
+
+## Локальная модель
+
+По умолчанию модель ищется по пути:
+- `/models/qwen2.5-3b-instruct-q4_k_m.gguf`
+
+В контейнере `rag-api` локальная модель монтируется из `./rag_test/models`.
+Если имя отличается, система автоматически выбирает первый `.gguf` в каталоге `/models`.
+
+## Хранение «неотвеченных» вопросов
+
+Если воркер не находит ответ, ASP.NET возвращает в `content` сообщение для техподдержки и при настроенной строке подключения `SupportDb` сохраняет запрос в таблицу `RagSupportRequests` в MSSQL. Это позволяет собирать вопросы для анализа и дальнейшего обучения.
+
+Строка подключения задаётся в `aspnet-backend/appsettings.json` → `ConnectionStrings:SupportDb` или через переменные окружения в `docker-compose.yml`.
+
+## Тюнинг и параметры
 
 Проверенные значения по умолчанию:
 - `LLM_N_CTX = 1536`
@@ -177,3 +226,6 @@ docker compose exec rag-api python3 tune_params.py
 
 Скрипт `tests/test.py` использует `POST /login` и `POST /chat` с полем `content` в ответе. Перед запуском убедитесь, что подняты `aspnet-api` и `rag-api`.
 
+---
+
+При необходимости README можно дополнить примерами подготовки `chunks.json` и настройкой production-секретов JWT (не использовать демо-ключ из `appsettings.json` в проде).
